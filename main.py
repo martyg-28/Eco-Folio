@@ -39,9 +39,30 @@ st.markdown("""
 
 def get_stock_data(stock_symbols, start_date, end_date):
     """Fetch stock data based on given symbols and date range."""
+    stock_symbols = [s for s in stock_symbols if s]  # Remove empty strings
+    if not stock_symbols:
+        st.error("Please enter at least one valid stock symbol.")
+        return pd.DataFrame()
+
     all_data = yf.download(stock_symbols, start=start_date, end=end_date)
-    price = all_data['Adj Close']
-    return price
+    if all_data.empty:
+        st.error("No data was returned. Please check your stock symbols or date range.")
+        return pd.DataFrame()
+
+    # Flatten columns if it's a multi-index
+    if isinstance(all_data.columns, pd.MultiIndex):
+        all_data.columns = [' '.join(col).strip() for col in all_data.columns]
+
+    # Use 'Adj Close' if available, otherwise fallback to 'Close'
+    if 'Adj Close' in all_data:
+        return all_data['Adj Close']
+    elif 'Close' in all_data:
+        st.warning("'Adj Close' not available. Using 'Close' instead.")
+        return all_data['Close']
+    else:
+        st.error("Neither 'Adj Close' nor 'Close' columns are available in the data.")
+        return pd.DataFrame()
+
 
 def analyze_stocks(price, stock_symbols, start_date, end_date):
     """Calculate risk, expected return, and CAGR for given stocks."""
