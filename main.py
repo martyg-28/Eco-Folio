@@ -19,24 +19,31 @@ with st.container():
 # Function to fetch stock data
 def get_stock_data(stock_symbols, start_date, end_date):
     """Fetch stock data based on given symbols and date range."""
-    stock_symbols = [s for s in stock_symbols if s]  # Remove empty strings
+    stock_symbols = [s.strip().upper() for s in stock_symbols if s]  # Ensure symbols are clean
+
     if not stock_symbols:
         st.error("Please enter at least one valid stock symbol.")
         return pd.DataFrame()
 
     try:
-        # Download data
+        # Fetch data
         all_data = yf.download(stock_symbols, start=start_date, end=end_date, group_by='ticker')
-        st.write("Raw Data:", all_data)  # Debug: Show raw data in Streamlit
 
-        # Handle grouped data by ticker
+        # Debugging: Print out the raw data structure
+        st.write("Raw Data Returned by yfinance:", all_data)
+
+        # If no data is returned at all
+        if all_data.empty:
+            st.error("No data returned. Possible reasons: invalid stock symbols or incorrect date range.")
+            return pd.DataFrame()
+
+        # Handle MultiIndex (if data is grouped by ticker)
         if isinstance(all_data.columns, pd.MultiIndex):
             st.warning("Data is grouped by ticker. Extracting 'Adj Close' prices for each symbol.")
-            # Extract 'Adj Close' for each ticker if available
             price_data = {ticker: all_data[ticker]['Adj Close'] for ticker in stock_symbols if 'Adj Close' in all_data[ticker]}
             price_df = pd.DataFrame(price_data)
         else:
-            # If data is not grouped, use 'Adj Close' or fallback to 'Close'
+            # If not grouped, try using 'Adj Close' or fallback to 'Close'
             if 'Adj Close' in all_data:
                 price_df = all_data['Adj Close']
             elif 'Close' in all_data:
@@ -46,7 +53,10 @@ def get_stock_data(stock_symbols, start_date, end_date):
                 st.error("No valid price data columns ('Adj Close' or 'Close') found.")
                 return pd.DataFrame()
 
-        # Ensure the final DataFrame is not empty
+        # Debug: Show the final processed data
+        st.write("Processed Price Data:", price_df)
+
+        # Final check
         if price_df.empty:
             st.error("No price data available. Please check your stock symbols or date range.")
             return pd.DataFrame()
@@ -55,6 +65,7 @@ def get_stock_data(stock_symbols, start_date, end_date):
     except Exception as e:
         st.error(f"Error fetching stock data: {e}")
         return pd.DataFrame()
+
 
 
 # Function to analyze stocks
