@@ -112,12 +112,17 @@ if calculate:
 
     # **Portfolio Optimization & Visualization**
     optimized_weights, optimized_ret, optimized_vol, optimized_sr = portfolio_analysis(price)
-    st.markdown("### Optimized Portfolio Weights")
-    fig, ax = plt.subplots(figsize=(5, 5))
-    wedges, _ = ax.pie(optimized_weights, labels=price.columns, autopct='%1.1f%%', startangle=90)
-    ax.axis('equal')
-    st.pyplot(fig)
-    st.write("These weights optimize the Sharpe Ratio, balancing return vs. risk.")
+
+    # **Fix for Pie Chart Issue**
+    if optimized_weights is not None and len(optimized_weights) == len(price.columns):
+        st.markdown("### Optimized Portfolio Weights")
+        fig, ax = plt.subplots(figsize=(5, 5))
+        wedges, _ = ax.pie(optimized_weights, labels=price.columns, autopct='%1.1f%%', startangle=90)
+        ax.axis('equal')
+        st.pyplot(fig)
+        st.write("These weights optimize the Sharpe Ratio, balancing return vs. risk.")
+    else:
+        st.error("Error: Could not generate portfolio weights. Please check your inputs.")
 
     # **Optimized Portfolio Stats**
     st.markdown("### Optimized Portfolio Return")
