@@ -62,22 +62,6 @@ def analyze_stocks(price, stock_symbols, start_date, end_date):
 
     return stock_stats
 
-# Function for portfolio analysis
-def portfolio_analysis(price):
-    """Perform portfolio optimization to find the max Sharpe ratio."""
-    log_returns = np.log(price / price.shift(1)).dropna()
-    num_stocks = len(price.columns)
-
-    all_weights = np.random.rand(6000, num_stocks)
-    all_weights /= all_weights.sum(axis=1)[:, np.newaxis]
-
-    ret_arr = np.dot(all_weights, log_returns.mean() * 252)
-    vol_arr = np.sqrt(np.einsum('ij,jk,ik->i', all_weights, log_returns.cov() * 252, all_weights))
-    sharpe_arr = np.where(vol_arr != 0, ret_arr / vol_arr, 0)
-
-    max_sharpe_idx = sharpe_arr.argmax()
-    return all_weights[max_sharpe_idx], ret_arr[max_sharpe_idx], vol_arr[max_sharpe_idx], sharpe_arr[max_sharpe_idx], ret_arr, vol_arr, sharpe_arr
-
 # User inputs for stock symbols
 stock_symbols = [st.sidebar.text_input(f'Enter stock symbol {i+1}', '').strip().upper() for i in range(5)]
 
@@ -111,43 +95,20 @@ if calculate:
             st.write(f"Expected Return: {stats['expected_return'] * 100:.2f}%")
             st.write(f"CAGR: {stats['cagr'] * 100:.2f}%")
 
-    if len(stock_symbols) > 1 and "correlation" in stock_stats:
-        st.write("### Correlation Matrix")
-        st.dataframe(stock_stats["correlation"].style.background_gradient(cmap='coolwarm').format("{:.2f}"))
+    # **Explainer Above ESG Considerations**
+    st.markdown("""
+    <div style="background-color: #F0F8FF; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+        <p style="text-align: center; font-size: 18px; color: #333; font-weight: bold;">
+            Selecting stocks with strong <span style="color: #2E8B57;">Environmental, Social, and Governance (ESG)</span> credentials can align your investments with your ethical standards.
+            A robust ESG score signifies a company's commitment to environmental sustainability, positive societal impact, and sound, transparent governance.
+            Such companies often exhibit long-term resilience. Explore the ESG profiles of companies in your portfolio using the links below.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
-        # Portfolio Optimization
-        optimized_weights, optimized_ret, optimized_vol, optimized_sr, ret_arr, vol_arr, sharpe_arr = portfolio_analysis(price)
-
-        st.write("### Optimized Portfolio Metrics")
-        st.write(f"Return: {optimized_ret * 100:.2f}%")
-        st.write(f"Volatility: {optimized_vol * 100:.2f}%")
-        st.write(f"Sharpe Ratio: {optimized_sr:.4f}")
-
-        # Pie chart for weights
-        st.write("### Optimized Portfolio Weights")
-        fig, ax = plt.subplots(figsize=(5, 5))  # Smaller pie chart
-        ax.pie(optimized_weights, labels=stock_symbols, autopct='%1.1f%%', startangle=90)
-        plt.title("Optimized Portfolio Weights", fontsize=14)
-        st.pyplot(fig)
-
-        # Efficient Frontier
-        st.write("### Efficient Frontier")
-        fig, ax = plt.subplots(figsize=(10, 6))  # Increase graph size
-        sc = ax.scatter(vol_arr, ret_arr, c=sharpe_arr, cmap='viridis', alpha=0.6, edgecolors="w", linewidth=0.5)
-        plt.colorbar(sc, label='Sharpe Ratio')
-        ax.scatter(optimized_vol, optimized_ret, c='red', s=100, edgecolors="k", label='Optimized Portfolio')
-        ax.legend(fontsize=12)
-        plt.xlabel("Volatility (Standard Deviation)")
-        plt.ylabel("Expected Return")
-        plt.title("Efficient Frontier", fontsize=16)
-        st.pyplot(fig)
-
-    with st.container():
-        st.markdown("""
-        ## ESG Considerations
-        Selecting stocks with strong **Environmental, Social, and Governance (ESG)** credentials can align your investments with ethical standards. A robust ESG score signifies a company's commitment to sustainability, societal impact, and governance.
-        """)
-        for stock in stock_symbols:
-            if stock:
-                esg_link = f"https://finance.yahoo.com/quote/{stock}/sustainability"
-                st.markdown(f"[{stock} ESG Data]({esg_link})", unsafe_allow_html=True)
+    # ESG Considerations Section
+    st.markdown("### ESG Considerations")
+    for stock in stock_symbols:
+        if stock:
+            esg_link = f"https://finance.yahoo.com/quote/{stock}/sustainability"
+            st.markdown(f"[{stock} ESG Data]({esg_link})", unsafe_allow_html=True)
