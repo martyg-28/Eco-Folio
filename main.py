@@ -102,8 +102,7 @@ def analyze_stocks(price, start_date, end_date):
 def portfolio_analysis(price):
     """
     Use a Monte Carlo approach to find the portfolio with the highest Sharpe Ratio.
-    Return the max Sharpe weights, expected return, volatility, and Sharpe ratio.
-    Also compute arrays for plotting if needed (ret_arr, vol_arr, sharpe_arr).
+    Returns best weights, expected return, volatility, Sharpe ratio, plus arrays for plotting.
     """
     # Compute daily log returns
     log_returns = np.log(price / price.shift(1)).dropna()
@@ -118,7 +117,7 @@ def portfolio_analysis(price):
     ret_arr = np.dot(all_weights, log_returns.mean() * 252)
     vol_arr = np.sqrt(np.einsum('ij,jk,ik->i', all_weights, (log_returns.cov() * 252), all_weights))
     
-    # Sharpe Ratio (no risk-free rate assumption for simplicity)
+    # Sharpe Ratio
     sharpe_arr = np.where(vol_arr == 0, 0, ret_arr / vol_arr)
 
     # Identify max Sharpe Ratio
@@ -187,7 +186,7 @@ if analyze_button:
             Mixing assets with lower or negative correlations can help reduce overall portfolio risk.
         """)
 
-    # 5) Portfolio Optimization
+    # 5) Portfolio Optimization (only if 2 or more stocks)
     if len(price_data.columns) > 1:
         (
             optimized_weights,
@@ -199,22 +198,26 @@ if analyze_button:
             sharpe_arr
         ) = portfolio_analysis(price_data)
 
-        # 5a) Show Pie Chart for Optimized Weights
+        # 5a) Show Pie Chart for Optimized Weights (with label distancing)
         st.markdown("## Optimized Portfolio Weights")
         fig, ax = plt.subplots(figsize=(6, 4))
-        colors = plt.cm.Set2.colors  # Distinguishable color set
+        colors = plt.cm.Set2.colors
 
-        # In case # of stocks > # of default colors, handle color cycle
         wedges, texts, autotexts = ax.pie(
             optimized_weights,
             labels=price_data.columns,
             autopct="%1.1f%%",
             startangle=90,
             colors=colors,
-            wedgeprops={"edgecolor": "black"}
+            wedgeprops={"edgecolor": "black"},
+            labeldistance=1.15,   # move wedge labels outward
+            pctdistance=0.8       # move percentage labels inward
         )
-        for text in texts + autotexts:
+
+        for text in texts:
             text.set_fontsize(9)
+        for autotext in autotexts:
+            autotext.set_fontsize(9)
 
         plt.title("Optimized Weights (Max Sharpe)", fontsize=14, fontweight='bold')
         plt.legend(
@@ -272,9 +275,9 @@ if analyze_button:
         st.markdown("""
         **Understanding the Graph**  
         - Each dot represents a unique portfolio (random combination of your selected stocks).  
-        - The color scale indicates the Sharpe Ratio. Brighter/yellow dots have higher Sharpe Ratios.  
-        - The red dot is the 'Optimized Portfolio' with the highest Sharpe Ratio.  
-        Ideally, you want a portfolio in the top-left area: **high return, low risk**.
+        - The color scale indicates the Sharpe Ratio (yellowish dots = higher risk-adjusted returns).  
+        - The red dot is the 'Optimized Portfolio' with the best risk-adjusted return.  
+        Ideally, a portfolio in the top-left area means **high return, low risk**.
         """)
 
     else:
