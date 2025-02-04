@@ -28,7 +28,6 @@ def get_stock_data(stock_symbols, start_date, end_date):
         all_data = yf.download(stock_symbols, start=start_date, end=end_date, group_by='ticker')
 
         if isinstance(all_data.columns, pd.MultiIndex):
-            st.warning("Extracting 'Adj Close' prices for each stock.")
             price_df = pd.DataFrame({stock: all_data[stock]['Adj Close'] for stock in stock_symbols if 'Adj Close' in all_data[stock]})
         else:
             price_df = all_data.get('Adj Close', all_data.get('Close', pd.DataFrame()))
@@ -126,24 +125,28 @@ if calculate:
 
         # Pie chart for weights
         st.write("### Optimized Portfolio Weights")
-        fig, ax = plt.subplots(figsize=(4, 4))
+        fig, ax = plt.subplots(figsize=(5, 5))  # Smaller pie chart
         ax.pie(optimized_weights, labels=stock_symbols, autopct='%1.1f%%', startangle=90)
-        plt.title("Optimized Portfolio Weights")
+        plt.title("Optimized Portfolio Weights", fontsize=14)
         st.pyplot(fig)
 
         # Efficient Frontier
-        fig, ax = plt.subplots(figsize=(12, 8))
+        st.write("### Efficient Frontier")
+        fig, ax = plt.subplots(figsize=(10, 6))  # Increase graph size
         sc = ax.scatter(vol_arr, ret_arr, c=sharpe_arr, cmap='viridis', alpha=0.6, edgecolors="w", linewidth=0.5)
         plt.colorbar(sc, label='Sharpe Ratio')
         ax.scatter(optimized_vol, optimized_ret, c='red', s=100, edgecolors="k", label='Optimized Portfolio')
         ax.legend(fontsize=12)
         plt.xlabel("Volatility (Standard Deviation)")
         plt.ylabel("Expected Return")
-        plt.title("Efficient Frontier")
+        plt.title("Efficient Frontier", fontsize=16)
         st.pyplot(fig)
 
     with st.container():
-        st.markdown("### ESG Considerations")
+        st.markdown("""
+        ## ESG Considerations
+        Selecting stocks with strong **Environmental, Social, and Governance (ESG)** credentials can align your investments with ethical standards. A robust ESG score signifies a company's commitment to sustainability, societal impact, and governance.
+        """)
         for stock in stock_symbols:
             if stock:
                 esg_link = f"https://finance.yahoo.com/quote/{stock}/sustainability"
