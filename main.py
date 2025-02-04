@@ -19,7 +19,7 @@ with st.container():
 # Function to fetch stock data
 def get_stock_data(stock_symbols, start_date, end_date):
     """Fetch stock data based on given symbols and date range."""
-    stock_symbols = [s.strip().upper() for s in stock_symbols if s]  # Ensure symbols are clean
+    stock_symbols = [s.strip().upper() for s in stock_symbols if s]
 
     if not stock_symbols:
         st.error("Please enter at least one valid stock symbol.")
@@ -32,31 +32,17 @@ def get_stock_data(stock_symbols, start_date, end_date):
         # Debugging: Print out the raw data structure
         st.write("Raw Data Returned by yfinance:", all_data)
 
-        # If no data is returned at all
-        if all_data.empty:
-            st.error("No data returned. Possible reasons: invalid stock symbols or incorrect date range.")
-            return pd.DataFrame()
-
         # Handle MultiIndex (if data is grouped by ticker)
         if isinstance(all_data.columns, pd.MultiIndex):
             st.warning("Data is grouped by ticker. Extracting 'Adj Close' prices for each symbol.")
             price_data = {ticker: all_data[ticker]['Adj Close'] for ticker in stock_symbols if 'Adj Close' in all_data[ticker]}
             price_df = pd.DataFrame(price_data)
         else:
-            # If not grouped, try using 'Adj Close' or fallback to 'Close'
-            if 'Adj Close' in all_data:
-                price_df = all_data['Adj Close']
-            elif 'Close' in all_data:
-                st.warning("'Adj Close' not available. Using 'Close' instead.")
-                price_df = all_data['Close']
-            else:
-                st.error("No valid price data columns ('Adj Close' or 'Close') found.")
-                return pd.DataFrame()
+            # If not grouped, use 'Adj Close' or fallback to 'Close'
+            price_df = all_data.get('Adj Close', all_data.get('Close', pd.DataFrame()))
 
-        # Debug: Show the final processed data
         st.write("Processed Price Data:", price_df)
 
-        # Final check
         if price_df.empty:
             st.error("No price data available. Please check your stock symbols or date range.")
             return pd.DataFrame()
@@ -65,8 +51,6 @@ def get_stock_data(stock_symbols, start_date, end_date):
     except Exception as e:
         st.error(f"Error fetching stock data: {e}")
         return pd.DataFrame()
-
-
 
 # Function to analyze stocks
 def analyze_stocks(price, stock_symbols, start_date, end_date):
@@ -111,13 +95,7 @@ def portfolio_analysis(price):
     return all_weights[max_sharpe_idx], ret_arr[max_sharpe_idx], vol_arr[max_sharpe_idx], sharpe_arr[max_sharpe_idx], ret_arr, vol_arr, sharpe_arr
 
 # User inputs for stock symbols
-stock_symbol_1 = st.sidebar.text_input('Enter stock symbol 1', '').strip().upper()
-stock_symbol_2 = st.sidebar.text_input('Enter stock symbol 2', '').strip().upper()
-stock_symbol_3 = st.sidebar.text_input('Enter stock symbol 3', '').strip().upper()
-stock_symbol_4 = st.sidebar.text_input('Enter stock symbol 4', '').strip().upper()
-stock_symbol_5 = st.sidebar.text_input('Enter stock symbol 5', '').strip().upper()
-
-stock_symbols = [stock_symbol_1, stock_symbol_2, stock_symbol_3, stock_symbol_4, stock_symbol_5]
+stock_symbols = [st.sidebar.text_input(f'Enter stock symbol {i+1}', '').strip().upper() for i in range(5)]
 
 # User inputs for date range
 date_range = st.sidebar.date_input(
@@ -153,3 +131,32 @@ if calculate:
         st.write("### Correlation Matrix")
         st.dataframe(stock_stats["correlation"].style.background_gradient(cmap='coolwarm').format("{:.2f}"))
 
+    if len(stock_symbols) > 1:
+        optimized_weights, optimized_ret, optimized_vol, optimized_sr, ret_arr, vol_arr, sharpe_arr = portfolio_analysis(price)
+
+        st.write("### Optimized Portfolio Metrics")
+        st.write(f"Return: {optimized_ret * 100:.2f}%")
+        st.write(f"Volatility: {optimized_vol * 100:.2f}%")
+        st.write(f"Sharpe Ratio: {optimized_sr:.4f}")
+
+        # Pie chart for weights
+        st.write("### Optimized Portfolio Weights")
+        fig, ax = plt.subplots(figsize=(4, 4))
+        ax.pie(optimized_weights, labels=stock_symbols, autopct='%1.1f%%', startangle=90)
+        plt.title("Optimized Portfolio Weights")
+        st.pyplot(fig)
+
+        # Max Sharpe Ratio Graph
+        fig, ax = plt.subplots(figsize=(12, 8))
+        sc = ax.scatter(vol_arr, ret_arr, c=sharpe_arr, cmap='viridis', alpha=0.6, edgecolors="w", linewidth=0.5)
+        plt.colorbar(sc, label='Sharpe Ratio')
+        ax.scatter(optimized_vol, optimized_ret, c='red', s=100, edgecolors="k", label='Optimized Portfolio')
+        ax.legend(fontsize=12)
+        st.pyplot(fig)
+
+    with st.container():
+        st.write("### ESG Considerations")
+        for stock in stock_symbols:
+            if stock:
+                esg_link = f"https://finance.yahoo.com/quote/{stock}/sustainability"
+                st.markdown(f"[{stock} ESG Data]({esg_link})", unsafe_allow_html=True)
