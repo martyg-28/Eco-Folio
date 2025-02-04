@@ -11,40 +11,30 @@ st.set_page_config(layout="wide", page_title="Eco-Folio: Financial Analysis Tool
 # Title & Introduction
 with st.container():
     st.markdown("""
-        <h1 style="text-align: center; color: #2E8B57; font-size: 50px; font-weight: bold; margin-bottom: 0;">Eco-Folio</h1>
-        <h2 style="text-align: center; color: #00008B; font-size: 30px; margin-top: 0;">Financial Analysis Tool</h2>
-        <hr style="height: 4px; background-color: #2E8B57; margin: 25px 0;">
+        <h1 style="text-align: center; color: #2E8B57; font-size: 50px; font-weight: bold;">Eco-Folio</h1>
+        <h2 style="text-align: center; color: #00008B;">Financial Analysis Tool</h2>
+        <hr style="height: 4px; background-color: #2E8B57;">
     """, unsafe_allow_html=True)
 
 # Function to fetch stock data
 def get_stock_data(stock_symbols, start_date, end_date):
-    """Fetch stock data based on given symbols and date range."""
+    """Fetch stock data from Yahoo Finance."""
     stock_symbols = [s.strip().upper() for s in stock_symbols if s]
-
     if not stock_symbols:
         st.error("Please enter at least one valid stock symbol.")
         return pd.DataFrame()
 
     try:
-        # Fetch data
         all_data = yf.download(stock_symbols, start=start_date, end=end_date, group_by='ticker')
 
-        # Debugging: Print out the raw data structure
-        st.write("Raw Data Returned by yfinance:", all_data)
-
-        # Handle MultiIndex (if data is grouped by ticker)
         if isinstance(all_data.columns, pd.MultiIndex):
-            st.warning("Data is grouped by ticker. Extracting 'Adj Close' prices for each symbol.")
-            price_data = {ticker: all_data[ticker]['Adj Close'] for ticker in stock_symbols if 'Adj Close' in all_data[ticker]}
-            price_df = pd.DataFrame(price_data)
+            st.warning("Extracting 'Adj Close' prices for each stock.")
+            price_df = pd.DataFrame({stock: all_data[stock]['Adj Close'] for stock in stock_symbols if 'Adj Close' in all_data[stock]})
         else:
-            # If not grouped, use 'Adj Close' or fallback to 'Close'
             price_df = all_data.get('Adj Close', all_data.get('Close', pd.DataFrame()))
 
-        st.write("Processed Price Data:", price_df)
-
         if price_df.empty:
-            st.error("No price data available. Please check your stock symbols or date range.")
+            st.error("No price data available. Check stock symbols or date range.")
             return pd.DataFrame()
 
         return price_df
@@ -54,36 +44,31 @@ def get_stock_data(stock_symbols, start_date, end_date):
 
 # Function to analyze stocks
 def analyze_stocks(price, stock_symbols, start_date, end_date):
-    """Calculate risk, expected return, and CAGR for given stocks."""
+    """Calculate risk, expected return, and CAGR for stocks."""
     if price.empty:
-        st.error("The price data is empty. Cannot perform analysis.")
-        return {}
-
-    valid_symbols = price.columns.tolist()
-    stock_symbols = [s for s in stock_symbols if s in valid_symbols]
-
-    if not stock_symbols:
-        st.error("No valid stock symbols available for analysis.")
+        st.error("No price data. Cannot perform analysis.")
         return {}
 
     log_returns = np.log(price / price.shift(1)).dropna()
-    stock_stats = {}
-    for stock in stock_symbols:
-        stock_stats[stock] = {
+    stock_stats = {
+        stock: {
             "risk": round(log_returns[stock].std(), 5),
             "expected_return": round(log_returns[stock].mean(), 5),
             "cagr": round(((price[stock].iloc[-1] / price[stock].iloc[0]) ** (1 / ((end_date - start_date).days / 365)) - 1), 5)
-        }
+        } for stock in stock_symbols if stock in price.columns
+    }
+
     if len(stock_symbols) > 1:
-        stock_stats["correlation"] = price[stock_symbols].corr()
+        stock_stats["correlation"] = price.corr()
+
     return stock_stats
 
 # Function for portfolio analysis
 def portfolio_analysis(price):
-    """Perform portfolio analysis on given stock prices."""
+    """Perform portfolio optimization to find the max Sharpe ratio."""
     log_returns = np.log(price / price.shift(1)).dropna()
-
     num_stocks = len(price.columns)
+
     all_weights = np.random.rand(6000, num_stocks)
     all_weights /= all_weights.sum(axis=1)[:, np.newaxis]
 
@@ -123,15 +108,15 @@ if calculate:
         stats = stock_stats.get(stock, {})
         if stats:
             st.markdown(f"### {stock} Metrics")
-            st.write(f"{stock} annualized risk: {stats['risk'] * 100:.2f}%")
-            st.write(f"{stock} expected return: {stats['expected_return'] * 100:.2f}%")
-            st.write(f"{stock} CAGR: {stats['cagr'] * 100:.2f}%")
+            st.write(f"Annualized Risk: {stats['risk'] * 100:.2f}%")
+            st.write(f"Expected Return: {stats['expected_return'] * 100:.2f}%")
+            st.write(f"CAGR: {stats['cagr'] * 100:.2f}%")
 
     if len(stock_symbols) > 1 and "correlation" in stock_stats:
         st.write("### Correlation Matrix")
         st.dataframe(stock_stats["correlation"].style.background_gradient(cmap='coolwarm').format("{:.2f}"))
 
-    if len(stock_symbols) > 1:
+        # Portfolio Optimization
         optimized_weights, optimized_ret, optimized_vol, optimized_sr, ret_arr, vol_arr, sharpe_arr = portfolio_analysis(price)
 
         st.write("### Optimized Portfolio Metrics")
@@ -146,16 +131,19 @@ if calculate:
         plt.title("Optimized Portfolio Weights")
         st.pyplot(fig)
 
-        # Max Sharpe Ratio Graph
+        # Efficient Frontier
         fig, ax = plt.subplots(figsize=(12, 8))
         sc = ax.scatter(vol_arr, ret_arr, c=sharpe_arr, cmap='viridis', alpha=0.6, edgecolors="w", linewidth=0.5)
         plt.colorbar(sc, label='Sharpe Ratio')
         ax.scatter(optimized_vol, optimized_ret, c='red', s=100, edgecolors="k", label='Optimized Portfolio')
         ax.legend(fontsize=12)
+        plt.xlabel("Volatility (Standard Deviation)")
+        plt.ylabel("Expected Return")
+        plt.title("Efficient Frontier")
         st.pyplot(fig)
 
     with st.container():
-        st.write("### ESG Considerations")
+        st.markdown("### ESG Considerations")
         for stock in stock_symbols:
             if stock:
                 esg_link = f"https://finance.yahoo.com/quote/{stock}/sustainability"
