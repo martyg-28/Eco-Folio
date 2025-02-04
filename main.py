@@ -62,6 +62,40 @@ def analyze_stocks(price, stock_symbols, start_date, end_date):
 
     return stock_stats
 
+# Function for portfolio analysis with Efficient Frontier
+def portfolio_analysis(price):
+    """Perform portfolio optimization to compute the Efficient Frontier."""
+    log_returns = np.log(price / price.shift(1)).dropna()
+    num_stocks = len(price.columns)
+
+    # Monte Carlo Simulation for Portfolio Optimization
+    num_portfolios = 20000
+    all_weights = np.random.rand(num_portfolios, num_stocks)
+    all_weights /= all_weights.sum(axis=1)[:, np.newaxis]
+
+    ret_arr = np.dot(all_weights, log_returns.mean() * 252)
+    vol_arr = np.sqrt(np.einsum('ij,jk,ik->i', all_weights, log_returns.cov() * 252, all_weights))
+    sharpe_arr = ret_arr / vol_arr  # Sharpe Ratio Calculation
+
+    # Efficient Frontier Calculation
+    efficient_frontier_x = []
+    efficient_frontier_y = []
+    unique_volatilities = np.linspace(min(vol_arr), max(vol_arr), 100)
+
+    for vol in unique_volatilities:
+        possible_returns = ret_arr[vol_arr <= vol]
+        if len(possible_returns) > 0:
+            efficient_frontier_x.append(vol)
+            efficient_frontier_y.append(max(possible_returns))  # Highest return at that volatility
+
+    # Max Sharpe Ratio Portfolio
+    max_sharpe_idx = sharpe_arr.argmax()
+    
+    return (
+        all_weights[max_sharpe_idx], ret_arr[max_sharpe_idx], vol_arr[max_sharpe_idx], sharpe_arr[max_sharpe_idx],
+        ret_arr, vol_arr, sharpe_arr, efficient_frontier_x, efficient_frontier_y
+    )
+
 # User inputs for stock symbols
 stock_symbols = [st.sidebar.text_input(f'Enter stock symbol {i+1}', '').strip().upper() for i in range(5)]
 
